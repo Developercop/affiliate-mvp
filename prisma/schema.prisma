@@ -1,34 +1,65 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+// Inicialmente será 'sqlite', pero el esquema es 100% compatible con Postgres
 datasource db {
   provider = "sqlite"
   url      = "file:dev.sqlite"
 }
 
+// Modelo base obligatorio para la autenticación en Shopify
 model Session {
-  id                  String    @id
+  id          String    @id
+  shop        String
+  state       String
+  isOnline    Boolean   @default(false)
+  scope       String?
+  expires     DateTime?
+  accessToken String
+  userId      BigInt?
+}
+
+// Requerimiento A.2: Gestión de Afiliados
+model Affiliate {
+  id        String   @id @default(uuid())
+  shop      String
+  name      String
+  code      String   // Identificador único (Ej: TIENDASMART) para los links ?ref=
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sales     Sale[]
+
+  // Cada tienda tiene sus propios códigos únicos de afiliados
+  @@unique([shop, code])
+  @@index([shop]) 
+}
+
+// Requerimiento A.3: Configuración de Comisión
+model ShopSettings {
+  id                         String   @id @default(uuid())
+  shop                       String   @unique
+  affiliateCommissionPercent Float    @default(5.0) // Porcentaje al afiliado (editable por merchant)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+// Requerimientos C y D: Tracking y Facturación
+model Sale {
+  id                  String    @id @default(uuid())
   shop                String
-  state               String
-  isOnline            Boolean   @default(false)
-  scope               String?
-  expires             DateTime?
-  accessToken         String
-  userId              BigInt?
-  firstName           String?
-  lastName            String?
-  email               String?
-  accountOwner        Boolean   @default(false)
-  locale              String?
-  collaborator        Boolean?  @default(false)
-  emailVerified       Boolean?  @default(false)
-  refreshToken        String?
-  refreshTokenExpires DateTime?
+  orderId             String    // ID oficial de la orden en Shopify (ej. gid://shopify/Order/..)
+  pixelEventId        String?   // Obtenido del Web Pixel para IDEMPOTENCIA
+  affiliateId         String
+  affiliate           Affiliate @relation(fields: [affiliateId], references: [id])
+  totalAmount         Float     // Total de la orden reportada
+  affiliateCommission Float     // Variable calculada en base al ShopSettings (Para Dashboard A.1)
+  appCommission       Float     // 5% Fijo (Para Dashboard y Regla de Negocio D)
+  appUsageChargeId    String?   // ID del UsageRecord en Shopify (Billing API)
+  createdAt           DateTime  @default(now())
+
+  // IDEMPOTENCIA: Prevenir cobros dobles si recibimos el mismo evento del Pixel 2 veces
+  @@unique([orderId, pixelEventId]) 
+  @@index([shop])
+  @@index([affiliateId])
 }

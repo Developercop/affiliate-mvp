@@ -1,0 +1,16 @@
+name = "Affiliate Pixel"
+type = "web_pixel_extension"
+uid = "e3f5748f-3882-54a4-1745-10bb2e07fb9a8f128a42"
+
+runtime_context = "strict"
+
+[settings]
+type = "object"
+
+[settings.fields.accountID]
+name = "Account ID"
+description = "Account ID"
+type = "single_line_text_field"
+validations =  [
+  { name = "min", value = "1" }
+]
