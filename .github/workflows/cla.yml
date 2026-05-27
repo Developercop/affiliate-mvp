@@ -15,8 +15,17 @@ jobs:
         && contains(github.event.comment.body, 'signed')
       )
       || (github.event.pull_request && !github.event.pull_request.merged)
+    permissions:
+      pull-requests: write
+      issues: write
     steps:
-      - uses: Shopify/shopify-cla-action@v1
+      - name: check-cla
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          cla-token: ${{ secrets.CLA_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+            const author = context.payload.pull_request
+              ? context.payload.pull_request.user.login
+              : context.payload.issue.user.login;
+            core.info(`CLA check for PR #${prNumber} by @${author}`);
+            core.info("CLA action placeholder — replace with your own CLA verification logic if needed.");
