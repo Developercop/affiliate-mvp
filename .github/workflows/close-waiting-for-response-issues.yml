@@ -6,15 +6,37 @@ on:
 jobs:
   check-need-info:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - name: close-issues
-        uses: actions-cool/issues-helper@45d75b6cf72bf4f254be6230cb887ad002702491 # v3.6.3
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
-          actions: "close-issues"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          labels: "Waiting for Response"
-          inactive-day: 14
-          body: |
-            We are closing this issue because we did not hear back regarding additional details we needed to resolve this issue. If the issue persists and you are able to provide the missing clarification we need, you can respond here or create a new issue.
-
-            We appreciate your understanding as we try to manage our number of open issues.
+          script: |
+            const label = "Waiting for Response";
+            const inactiveDays = 14;
+            const cutoff = new Date(Date.now() - inactiveDays * 24 * 60 * 60 * 1000);
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: label,
+              per_page: 100,
+            });
+            for (const issue of issues) {
+              const updatedAt = new Date(issue.updated_at);
+              if (updatedAt < cutoff) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: "We are closing this issue because we did not hear back regarding additional details we needed to resolve this issue. If the issue persists and you are able to provide the missing clarification we need, you can respond here or create a new issue.\n\nWe appreciate your understanding as we try to manage our number of open issues.",
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: "closed",
+                });
+              }
+            }
